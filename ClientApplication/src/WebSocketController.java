@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Base64;
 
 import javax.json.Json;
@@ -21,8 +22,10 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -37,11 +40,13 @@ public class WebSocketController{
 	@FXML Button btnSend;
 	@FXML Button btnAttach;
 	@FXML Button btnSave;
+	@FXML ChoiceBox<String> fileChoiceBox;
+	
+	private ArrayList<String> sentFileName = new ArrayList<>();
+	private ArrayList<String> sentFileUser = new ArrayList<>();
+	private ArrayList<String> sentFileData = new ArrayList<>();
 	
 	private String user;
-	private String lastFileName;
-	private String lastFileUser;
-	private String lastFileData;
 	private WebSocketClient webSocketClient;
 	
 	@FXML private void initialize() {
@@ -50,6 +55,7 @@ public class WebSocketController{
 		btnSend.setDisable(true);
 		btnAttach.setDisable(true);
 		btnSave.setDisable(true);
+		chatTextArea.setEditable(false);
 	}
 	
 	@FXML private void btnSet_Click() {
@@ -114,6 +120,19 @@ public class WebSocketController{
 	}
 	
 	@FXML private void btnSave_Click() {
+		if(fileChoiceBox.getSelectionModel().isEmpty())
+			return;
+		String fileNameWithNumber = fileChoiceBox.getSelectionModel().getSelectedItem().toString();
+		System.out.println("wybrano --> " + fileNameWithNumber);
+		String[] parts = fileNameWithNumber.split(":");
+		String fileNr = parts[0]; 
+		String lastFileName = (parts[1]).substring(1); //space removed
+		System.out.println(fileNr + lastFileName);
+		int index = Integer.parseInt(fileNr) - 1;
+		
+		String lastFileUser = sentFileUser.get(index);
+		String lastFileData = sentFileUser.get(index);
+		
 		if(lastFileName == null)
 			return;
 		FileChooser fileChooser = new FileChooser();
@@ -126,7 +145,6 @@ public class WebSocketController{
 			try {
 				fileOutputStream = new FileOutputStream(file);
 			} catch (FileNotFoundException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 			byte[] data = lastFileData.getBytes();
@@ -135,7 +153,6 @@ public class WebSocketController{
 				fileOutputStream.write(decodedData);
 				fileOutputStream.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			
@@ -186,9 +203,12 @@ public class WebSocketController{
 			}
 			else {
 				chatTextArea.setText(chatTextArea.getText() + "Użytkownik " + who + " wysłał plik " + text + "\n");
-				lastFileName = text;
-				lastFileUser = who;
-				lastFileData = data;
+				sentFileName.add(text);
+				sentFileUser.add(who);
+				sentFileData.add(data);
+				ObservableList<String> c = fileChoiceBox.getItems();
+				int fileNr = c.size() + 1;
+				fileChoiceBox.getItems().add(fileNr + ": " +text);
 			}
 		}
 		
