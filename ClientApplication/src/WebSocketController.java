@@ -1,12 +1,14 @@
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.Files;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Date;
 
 import javax.json.Json;
 import javax.json.JsonObject;
@@ -22,8 +24,9 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.TextArea;
@@ -42,9 +45,8 @@ public class WebSocketController{
 	@FXML Button btnSave;
 	@FXML ChoiceBox<String> fileChoiceBox;
 	
-	private ArrayList<String> sentFileName = new ArrayList<>();
-	private ArrayList<String> sentFileUser = new ArrayList<>();
-	private ArrayList<String> sentFileData = new ArrayList<>();
+	private ArrayList<FileInformation> filesSent = new ArrayList<>();
+	private final int MAX_FILE_LENGHT = 2000000;
 	
 	private String user;
 	private WebSocketClient webSocketClient;
@@ -98,13 +100,37 @@ public class WebSocketController{
 		messageTextField.setPromptText(null);
 	}
 	
+	
+	private void getTooLargeFileAlert() {
+		Alert alert = new Alert(AlertType.INFORMATION);
+		alert.setTitle("File is too large");
+		alert.setHeaderText("A file you tried to attach was too large - the limit is 2MB.");
+		alert.setContentText("Larger files should be sent as a link to a cloud.\nTry to compress it or send it this way.");
+		alert.showAndWait();
+	}
+	
+	private void getInvalidPathAlert(IOException e) {
+		Alert alert = new Alert(AlertType.ERROR);
+		alert.setTitle("INVALID PATH TO FILE");
+		alert.setHeaderText("Attaching file generated the error");
+		alert.setContentText("Error: " + e);
+		alert.showAndWait();
+	}
+	
 	@FXML private void btnAttach_Click() {		
 		FileChooser fileChooser = new FileChooser();
 		fileChooser.setTitle("Open Resource File");
 		File selectedFile = fileChooser.showOpenDialog(null);
 		
 		if(selectedFile != null)
-		{	
+		{
+			if(selectedFile.length() > MAX_FILE_LENGHT)
+			{
+				getTooLargeFileAlert();
+				return;
+			}
+			
+			//file lenght is ok
 			try {
 				ChatMessage msg = new ChatMessage(user, "file");
 				String n = selectedFile.getName();
@@ -114,48 +140,52 @@ public class WebSocketController{
 				JsonObject toSend =  getJson(msg);
 				webSocketClient.sendMessage(toSend.toString());
 			} catch (IOException e) {
-				System.out.println("INVALID PATH TO FILE");
+				getInvalidPathAlert(e);
 			}	
 		}
+	}
+	
+	FileInformation getFileInformationByDateAndFileName(String date, String name) {
+		 for (FileInformation f : filesSent) {
+		        if (f.getSentDate().equals(date) && f.getFileName().equals(name)) {
+		            return f;
+		        }
+		    }
+		    return null; 
 	}
 	
 	@FXML private void btnSave_Click() {
 		if(fileChoiceBox.getSelectionModel().isEmpty())
 			return;
-		String fileNameWithNumber = fileChoiceBox.getSelectionModel().getSelectedItem().toString();
-		System.out.println("wybrano --> " + fileNameWithNumber);
-		String[] parts = fileNameWithNumber.split(":");
-		String fileNr = parts[0]; 
-		String lastFileName = (parts[1]).substring(1); //space removed
-		System.out.println(fileNr + lastFileName);
-		int index = Integer.parseInt(fileNr) - 1;
 		
-		String lastFileUser = sentFileUser.get(index);
-		String lastFileData = sentFileUser.get(index);
+		// getting the proper sentDate and filename from fileChoiceBox
+		String fileNameWithDate = fileChoiceBox.getSelectionModel().getSelectedItem().toString();
+		int lastIndexOf =fileNameWithDate.lastIndexOf('(');
+		String lastFileName = fileNameWithDate.substring(0, lastIndexOf - 1);
+		String lastFileDate = fileNameWithDate.substring(lastIndexOf + 1, fileNameWithDate.length() - 1);
 		
-		if(lastFileName == null)
-			return;
-		FileChooser fileChooser = new FileChooser();
-		String title = "Save file \"" + lastFileName +"\" from " + lastFileUser;
-		fileChooser.setTitle(title);
-		fileChooser.setInitialFileName(lastFileName);
-		File file = fileChooser.showSaveDialog(null);
-		if(file != null) {
-			FileOutputStream fileOutputStream = null;
-			try {
-				fileOutputStream = new FileOutputStream(file);
-			} catch (FileNotFoundException e1) {
-				e1.printStackTrace();
-			}
-			byte[] data = lastFileData.getBytes();
-			byte[] decodedData = Base64.getDecoder().decode(data);
-			try {
-				fileOutputStream.write(decodedData);
-				fileOutputStream.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			
+		FileInformation fileToSave = getFileInformationByDateAndFileName(lastFileDate, lastFileName);
+		
+		// saving file
+		if(fileToSave != null) {
+			FileChooser fileChooser = new FileChooser();
+			String title = "Save file \"" + lastFileName +"\" from " + fileToSave.getUser();
+			fileChooser.setTitle(title);
+			fileChooser.setInitialFileName(lastFileName);
+			File file = fileChooser.showSaveDialog(null);
+				if(file != null){
+					try {
+					FileOutputStream fileOutputStream = null;
+					fileOutputStream = new FileOutputStream(file);
+					byte[] data = fileToSave.getData();
+					byte[] decodedData = Base64.getDecoder().decode(data);
+					fileOutputStream.write(decodedData);
+					fileOutputStream.close();
+					}
+					catch (IOException e) {
+						e.printStackTrace();
+					}		
+				}
 		}
 	}
 	
@@ -189,26 +219,29 @@ public class WebSocketController{
 			throwable.printStackTrace();
 		}
 		@OnMessage public void onMessage(String message, Session session) {
-			System.out.println("Message was received");
-			System.out.println(message);
+			//System.out.println("Message was received");
 			JsonReader reader = Json.createReader(new StringReader(message));
 			JsonObject inc = reader.readObject();
 			String who = inc.getString("who");
 			String type = inc.getString("type");
 			String text = inc.getString("text");
 			String data = inc.getString("data");
-			System.out.println(who + " " + type);
 			if(type.equals("message")) {
 				chatTextArea.setText(chatTextArea.getText() + who + ":" + text + "\n");
 			}
 			else {
 				chatTextArea.setText(chatTextArea.getText() + "Użytkownik " + who + " wysłał plik " + text + "\n");
-				sentFileName.add(text);
-				sentFileUser.add(who);
-				sentFileData.add(data);
-				ObservableList<String> c = fileChoiceBox.getItems();
-				int fileNr = c.size() + 1;
-				fileChoiceBox.getItems().add(fileNr + ": " +text);
+				FileInformation sentFile = new FileInformation();
+				sentFile.setData(data.getBytes());
+				sentFile.setUser(who);
+				sentFile.setFileName(text);
+				
+				DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+				Date date = new Date();
+				sentFile.setSentDate(dateFormat.format(date));
+				filesSent.add(sentFile);
+				
+				fileChoiceBox.getItems().add(text + " (" + dateFormat.format(date) + ")");
 			}
 		}
 		
@@ -226,7 +259,7 @@ public class WebSocketController{
 		
 		public void sendMessage(String message) {
 			try {
-				System.out.println("Message was sent: " + message);
+				//System.out.println("Message was sent: " + message);
 				session.getBasicRemote().sendText(message);
 			}
 			catch (IOException ex) {
