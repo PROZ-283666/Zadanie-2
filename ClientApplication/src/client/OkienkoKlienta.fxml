@@ -7,7 +7,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<AnchorPane minHeight="300.0" minWidth="450.0" prefHeight="331.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/9.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="WebSocketController">
+<AnchorPane minHeight="300.0" minWidth="450.0" prefHeight="331.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/9.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.WebSocketController">
    <children>
       <Label layoutX="34.0" layoutY="27.0" text="User:" />
       <Label layoutX="33.0" layoutY="127.0" text="Chat:" />

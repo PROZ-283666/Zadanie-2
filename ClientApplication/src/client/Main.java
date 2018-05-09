@@ -1,3 +1,5 @@
+package client;
+
 import javax.websocket.CloseReason;
 import javax.websocket.CloseReason.CloseCodes;
 import javafx.application.Application;

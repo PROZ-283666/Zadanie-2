@@ -1,3 +1,4 @@
+package client;
 
 public class ChatMessage implements java.io.Serializable {
 

@@ -1,3 +1,5 @@
+package client;
+
 public class FileInformation {
 	private String user;
 	private String fileName;
