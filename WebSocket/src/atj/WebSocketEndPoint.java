@@ -11,7 +11,7 @@ import javax.websocket.server.ServerEndpoint;
 
 @ApplicationScoped
 @ServerEndpoint("/websocketendpoint")
-public class WebSocketEndpoint {
+public class WebSocketEndPoint {
 	
 	@OnOpen
 	public void onOpen(Session session) { }
